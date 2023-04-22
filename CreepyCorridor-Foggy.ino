@@ -42,8 +42,6 @@ CRGB leds[NUM_LEDS];
 WiFiClient client;
 Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
 Adafruit_MQTT_Subscribe creepyMode = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/creepy-corridor.creepymode");
-//Adafruit_MQTT_Subscribe foggyMode = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/creepy-corridor.foggy");
-//Adafruit_MQTT_Subscribe simulateSensor = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/creepy-corridor.simulate");
 
 //MP3 Player
 #include "DFRobotDFPlayerMini.h"
@@ -62,7 +60,7 @@ SoftwareSerial mySoftwareSerial(D4, D2);  //Pins for MP3 Player Serial (RX, TX)
 int operationalMode = 1;
 int beginFog = 0;
 int fogIsRunning = 0;
-int fogDuration = 8000;
+int fogDuration = 15000;
 uint16_t valueFoggy = 0;
 uint16_t simulateTrigger = 0;
 unsigned long previousMillis = 0;
@@ -101,6 +99,7 @@ void setup() {
   for (int i = 0; i < NUM_LEDS; i++) {
     setPixel(i, 0, 0, 255);
     FastLED.show();
+    FastLED.show();
   }
   delay(10);
   FastLED.show();
@@ -110,8 +109,6 @@ void setup() {
 
   //Initialize MQTT
   mqtt.subscribe(&creepyMode);
-  //mqtt.subscribe(&foggyMode);
-  //mqtt.subscribe(&simulateSensor);
   MQTT_connect();
 
   //MP3
@@ -136,12 +133,7 @@ void setup() {
   delay(250);
 
   //All set
-  FastLED.clear();
-  FastLED.show();
-  delay(50);
-  FastLED.show();
   Serial.println("Setup Complete!");
-  delay(3000);
 }
 
 
@@ -166,13 +158,13 @@ void loop() {
     if (valueOperational == 1 || valueOperational == 2) {
       operationalMode = valueOperational;
     }
-    else if(valueOperational == 11){
+    else if (valueOperational == 11) {
       beginFog = 1;
     }
-    else if(valueOperational == 103){
+    else if (valueOperational == 103) {
       simulateTrigger = 1;
     }
-    else{}
+    else {}
     delay(10);
   }
 
@@ -196,7 +188,7 @@ void loop() {
     delay(10);
     FastLED.show();
   }
-  
+
   else if (operationalMode == 1) {                        //Standard Operation
     // 1. Sense for peeps or MQTT Trigger
     // 2. Close Sync relay with Spoders
@@ -204,110 +196,116 @@ void loop() {
     // 4. Flash Strobe relay
     // 5. Blue glow on light bar
 
-    FastLED.clear();
-    FastLED.show();
     int sensorReading = digitalRead(sensor);
     if (sensorReading == HIGH || simulateTrigger == 1) {
       delay(100); //Prevents false readings
       int sensorReading2 = digitalRead(sensor);
       if (sensorReading2 == HIGH || simulateTrigger == 1) {
-
-        Serial.println("[Begin Foggy Performance]");
-
-        // ** SYNC WITH SPODER BRAIN **
-        Serial.println("**SYNC");
-        digitalWrite(syncWithSpoderRelay, LOW);
         delay(100);
-        digitalWrite(syncWithSpoderRelay, HIGH);
+        int sensorReading3 = digitalRead(sensor);
+        if (sensorReading3 == HIGH || simulateTrigger == 1) {
 
-        // ** THUNDER & SPIDERS **
-        Serial.println("**THUNDER AND SPIDERS**");
-        songSelection = 1;
-        myDFPlayer.play(songSelection);
+          Serial.println("[Begin Foggy Performance]");
 
-        // ** STROBE **
-        Serial.println("**STROBE**");
-        digitalWrite(strobeRelay, LOW);
-        //Delay must be broken up to check for foggy
-        int playTime = 7;
-        for (int i = 0; i < playTime; i++) {
-          delay(500);
+          // ** SYNC WITH SPODER BRAIN **
+          Serial.println("**SYNC");
+          digitalWrite(syncWithSpoderRelay, LOW);
+          delay(100);
+          digitalWrite(syncWithSpoderRelay, HIGH);
 
-          if (fogIsRunning == 1) {
-            unsigned long currentTime = millis();
-            Serial.print("time: ");
-            Serial.println(currentTime - previousTime);
-            if ((currentTime - previousTime) > fogDuration) {
-              previousTime = currentTime;
-              fogIsRunning = 0;
-              digitalWrite(fogMachineOffRelay, HIGH);
-              delay(300);
-              digitalWrite(fogMachineOffRelay, LOW);
-              Serial.println("FOG OFF");
+          // ** THUNDER & SPIDERS **
+          Serial.println("**THUNDER AND SPIDERS**");
+          songSelection = 1;
+          myDFPlayer.play(songSelection);
+
+          // ** STROBE **
+          Serial.println("**STROBE**");
+          digitalWrite(strobeRelay, LOW);
+          //Delay must be broken up to check for foggy
+          int playTime = 7;
+          for (int i = 0; i < playTime; i++) {
+            delay(500);
+            if (fogIsRunning == 1) {
+              unsigned long currentTime = millis();
+              Serial.print("time: ");
+              Serial.println(currentTime - previousTime);
+              if ((currentTime - previousTime) > fogDuration) {
+                previousTime = currentTime;
+                fogIsRunning = 0;
+                digitalWrite(fogMachineOffRelay, HIGH);
+                delay(300);
+                digitalWrite(fogMachineOffRelay, LOW);
+                Serial.println("FOG OFF");
+              }
             }
           }
-        }
-        digitalWrite(strobeRelay, HIGH);
+          digitalWrite(strobeRelay, HIGH);
 
-        // ** LEDS **
-        Serial.println("**leds");
-        b = 0;
-        while (b < 255) {
-          for (int i = 0; i < NUM_LEDS; i++) {
-            setPixel(i, 0, 0, b);
-          }
-          b++;
-          delay(5);
-          FastLED.show();
-        }
-        //Delay must be broken up to check for foggy
-        playTime = 108;
-        for (int i = 0; i < playTime; i++) {
-          delay(500);
+          /*
 
-          if (fogIsRunning == 1) {
-            unsigned long currentTime = millis();
-            Serial.print("time: ");
-            Serial.println(currentTime - previousTime);
-            if ((currentTime - previousTime) > fogDuration) {
-              previousTime = currentTime;
-              fogIsRunning = 0;
-              digitalWrite(fogMachineOffRelay, HIGH);
-              delay(300);
-              digitalWrite(fogMachineOffRelay, LOW);
-              Serial.println("FOG OFF");
+            // ** LEDS **
+            Serial.println("**leds");
+            b = 0;
+            while (b < 255) {
+            for (int i = 0; i < NUM_LEDS; i++) {
+              setPixel(i, 0, 0, b);
+            }
+            b++;
+            delay(5);
+            FastLED.show();
+            }
+            }
+            while (b > 0) {
+            for (int i = 0; i < NUM_LEDS; i++) {
+              setPixel(i, 0, 0, b);
+            }
+            b--;
+            delay(5);
+            FastLED.show();
+            }
+
+          */
+          //Delay must be broken up to check for foggy
+          playTime = 56;
+          for (int i = 0; i < playTime; i++) {
+            delay(500);
+            if (fogIsRunning == 1) {
+              unsigned long currentTime = millis();
+              Serial.print("time: ");
+              Serial.println(currentTime - previousTime);
+              if ((currentTime - previousTime) > fogDuration) {
+                previousTime = currentTime;
+                fogIsRunning = 0;
+                digitalWrite(fogMachineOffRelay, HIGH);
+                delay(300);
+                digitalWrite(fogMachineOffRelay, LOW);
+                Serial.println("FOG OFF");
+              }
             }
           }
+          myDFPlayer.stop();
+          simulateTrigger = 0;
+          Serial.println("[End Foggy Performance]");
         }
-        while (b > 0) {
-          for (int i = 0; i < NUM_LEDS; i++) {
-            setPixel(i, 0, 0, b);
-          }
-          b--;
-          delay(5);
-          FastLED.show();
-        }
-        simulateTrigger = 0;
       }
-      Serial.println("[End Foggy Performance]");
     }
-  }
 
-  //Fog Timer
-  if (fogIsRunning == 1) {
-    unsigned long currentTime = millis();
-    Serial.print("time: ");
-    Serial.println(currentTime - previousTime);
-    if ((currentTime - previousTime) > fogDuration) {
-      previousTime = currentTime;
-      fogIsRunning = 0;
-      digitalWrite(fogMachineOffRelay, HIGH);
-      delay(300);
-      digitalWrite(fogMachineOffRelay, LOW);
-      Serial.println("FOG OFF");
+    //Fog Timer
+    if (fogIsRunning == 1) {
+      unsigned long currentTime = millis();
+      Serial.print("time: ");
+      Serial.println(currentTime - previousTime);
+      if ((currentTime - previousTime) > fogDuration) {
+        previousTime = currentTime;
+        fogIsRunning = 0;
+        digitalWrite(fogMachineOffRelay, HIGH);
+        delay(300);
+        digitalWrite(fogMachineOffRelay, LOW);
+        Serial.println("FOG OFF");
+      }
     }
+    delay(1);
   }
-  delay(1);
 }
 
 
